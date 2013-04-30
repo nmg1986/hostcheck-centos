@@ -1,0 +1,91 @@
+#!/bin/bash
+
+smtp_server="tmail.zch168.net"
+send_from="niuminguo@tmail.zch168.net"
+send_to="niuminguo@tmail.zch168.net"
+send_cc="niuminguo@tmail.zch168.net"
+send_user="niuminguo@tmail.zch168.net"
+send_password="P@ssw0rd"
+
+mail=/usr/hostcheck/sbin/sendEmail
+ping=/usr/hostcheck/sbin/check_ping
+
+test -n $1 && { 
+	CONF_FILE="$1"
+}
+test -z $1 && {
+	CONF_FILE=/etc/hostcheck.ini
+}
+
+send_email()
+{
+	log "[send email]" "[start]"
+	$mail   -s $smtp_server \
+		-f $send_from \
+		-t $send_to \
+		-cc $send_cc \
+		-u "警告：宕机告警" \
+		-m "<html>
+            	    	<hr/>
+            		<font color="red"><strong>告警主机 : $1 </strong></font><br><br>
+            		<font color="red"><strong>所属机房 : 酒仙桥</strong></font><br><br>
+            		<font color="red"><strong>告警原因 : $2 </strong></font><br><br>
+            		<font color="red"><strong>告警时间 : $(date +'%Y-%m-%d') $(date +'%H:%M:%S') </strong></font><br>
+            		<hr/>
+         	</html>" \
+		-xu $send_user \
+		-xp $send_password 
+		-o message-charset=utf-8 >/dev/null 2>/dev/null
+	if [ $? -eq 0 ];then
+		log "[send email]" "[succeed]"
+	else
+		log "[send email]" "[failed]"
+	fi
+
+}
+
+log()
+{
+	echo "$(date +'%Y-%m-%d') $(date +'%H:%M:%S')  $1   $2" >> /var/log/hostcheck.log
+}
+	
+while true
+do
+	while read host 
+	do
+		if [ X"$host" = X ];then
+			continue
+		fi
+
+		if [ "${host:0:1}" = "#" ];then
+			continue
+		fi
+		
+		if [ ! -d /var/lib/hostcheck/$host ];then
+			mkdir -p /var/lib/hostcheck/$host
+			echo "0" > /var/lib/hostcheck/$host/online
+			echo "0" > /var/lib/hostcheck/$host/offline
+		fi
+
+		if  $ping -H "$host" -w 10,20% -c 40,50% > /dev/null 2>&1
+		then
+			if [ "$(</var/lib/hostcheck/$host/offline)" -ne 0 ];then 
+				echo 0 > /var/lib/hostcheck/$host/offline
+				send_email "$host" "recovery"
+				log "[${host}]" "[recovery]"
+			else
+				log "[${host}]" "[online]"
+			fi
+		else
+			value=$(</var/lib/hostcheck/$host/offline)
+			if [ "$value" -lt 3 ];then
+				send_email "${host}" "offline"
+			fi
+			echo "$(expr $value + 1)" > /var/lib/hostcheck/$host/offline
+			log "[${host}]" "[offline]"
+		fi
+		sleep 1
+
+	done < $CONF_FILE 
+sleep 1
+done

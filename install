@@ -1,0 +1,31 @@
+#!/bin/bash
+
+echo -n "Install Hostcheck Daemon..."
+
+if [ ! -d /usr/hostcheck ];then
+	mkdir /usr/hostcheck
+fi
+
+if [ ! -d /usr/hostcheck/bin ];then
+	mkdir /usr/hostcheck/bin
+fi
+
+if [ ! -d /usr/hostcheck/sbin ];then
+	mkdir /usr/hostcheck/sbin
+fi
+
+if [ ! -d /usr/hostcheck/etc ];then
+	mkdir /usr/hostcheck/etc
+fi		
+
+
+install bin/hostcheck   /usr/hostcheck/bin
+install sbin/sendEmail  /usr/hostcheck/sbin
+install sbin/check_ping /usr/hostcheck/sbin
+install sbin/hostcheck-init /etc/init.d/hostcheck
+install etc/hostcheck.ini /usr/hostcheck/etc
+ln -sf  /etc/init.d/hostcheck  /usr/sbin/rchostcheck
+ln -sf  /usr/hostcheck/etc/hostcheck.ini /etc
+
+
+echo "Done"
